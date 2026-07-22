@@ -1,26 +1,80 @@
 @import "tailwindcss";
 
+/* Role tokens from the validated reference palette (dataviz skill).
+   Light and dark are both selected steps, not automatic flips. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --series-1: #2a78d6; /* categorical slot 1 (blue) */
+  --series-1-track: #cde2fb; /* sequential step 100 — meter track */
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+  --success-text: #006300;
+
+  /* tinted chip backgrounds (status hue at low alpha over surface) */
+  --tint-good: rgba(12, 163, 12, 0.12);
+  --tint-warning: rgba(250, 178, 25, 0.18);
+  --tint-critical: rgba(208, 59, 59, 0.12);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+
+    --series-1: #3987e5;
+    --series-1-track: #0d366b; /* sequential step 700 — dark meter track, recessive */
+
+    --success-text: #0ca30c;
+
+    --tint-good: rgba(12, 163, 12, 0.2);
+    --tint-warning: rgba(250, 178, 25, 0.16);
+    --tint-critical: rgba(208, 59, 59, 0.24);
   }
 }
 
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-grid: var(--grid);
+  --color-baseline: var(--baseline);
+  --color-borderc: var(--border);
+  --color-series-1: var(--series-1);
+  --color-series-1-track: var(--series-1-track);
+  --color-good: var(--status-good);
+  --color-warning: var(--status-warning);
+  --color-serious: var(--status-serious);
+  --color-critical: var(--status-critical);
+  --color-success-text: var(--success-text);
+  --color-tint-good: var(--tint-good);
+  --color-tint-warning: var(--tint-warning);
+  --color-tint-critical: var(--tint-critical);
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
