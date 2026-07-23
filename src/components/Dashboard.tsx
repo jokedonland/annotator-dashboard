@@ -37,18 +37,17 @@ export function Dashboard({
   const isReviewer = data.role === "Reviewer";
   // Default to the role-appropriate view, but never an empty one when the
   // other side has rows (a Reviewer-tagged super-writer may only have writes).
+  // Reviewer-tagged users (all super-writers) always get the merged/combined
+  // views, even when one side has no activity in the loaded data.
+  const dualView = isReviewer || (data.writes.length > 0 && data.reviews.length > 0);
   const [taskMode, setTaskMode] = useState<"all" | "writes" | "reviews">(() => {
-    if (data.writes.length > 0 && data.reviews.length > 0) return "all";
-    if (data.writes.length === 0 && data.reviews.length > 0) return "reviews";
-    if (data.reviews.length === 0 && data.writes.length > 0) return "writes";
-    return isReviewer ? "reviews" : "writes";
+    if (dualView) return "all";
+    return data.writes.length === 0 && data.reviews.length > 0 ? "reviews" : "writes";
   });
   // AHT view: dual-role users default to the combined (blended-target) view.
   const [ahtMode, setAhtMode] = useState<"combined" | "writes" | "reviews">(() => {
-    if (data.writes.length > 0 && data.reviews.length > 0) return "combined";
-    if (data.writes.length === 0 && data.reviews.length > 0) return "reviews";
-    if (data.reviews.length === 0 && data.writes.length > 0) return "writes";
-    return isReviewer ? "reviews" : "writes";
+    if (dualView) return "combined";
+    return data.writes.length === 0 && data.reviews.length > 0 ? "reviews" : "writes";
   });
 
   async function logout() {
@@ -149,7 +148,8 @@ function AhtTab({
   setMode: (m: "combined" | "writes" | "reviews") => void;
 }) {
   const m = data.metrics;
-  const dualRole = data.writes.length > 0 && data.reviews.length > 0;
+  const dualRole =
+    data.role === "Reviewer" || (data.writes.length > 0 && data.reviews.length > 0);
   const allTimeCombined = m.combined.find((w) => w.window === "allTime")!;
 
   // Per-view target: combined uses the blended target for the user's actual
@@ -287,7 +287,8 @@ function TasksTab({
 }) {
   const isReviewer = data.role === "Reviewer";
   const m = data.metrics;
-  const dualRole = data.writes.length > 0 && data.reviews.length > 0;
+  const dualRole =
+    data.role === "Reviewer" || (data.writes.length > 0 && data.reviews.length > 0);
   // Merged view, newest first regardless of kind
   const allRows = [...data.writes, ...data.reviews].sort((a, b) =>
     (b.dateRaw || "").localeCompare(a.dateRaw || "")
