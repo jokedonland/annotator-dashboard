@@ -9,7 +9,7 @@
  *
  * Local dev: plain files under .data/ with the same naming scheme.
  */
-import { list, put, del } from "@vercel/blob";
+import { list, put, del, get } from "@vercel/blob";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -66,9 +66,14 @@ async function listAll(): Promise<VersionRef[]> {
 
 async function readJson(ref: VersionRef): Promise<StoredDataset> {
   if (useBlob()) {
-    const res = await fetch(ref.url!, { cache: "no-store" });
-    if (!res.ok) throw new Error(`blob fetch failed: ${res.status}`);
-    return (await res.json()) as StoredDataset;
+    // Private store: reads go through the SDK with the RW token, never plain fetch.
+    // Every blob id is unique (timestamp+random), so CDN caching is safe.
+    const res = await get(ref.id, { access: "private" });
+    if (!res || res.statusCode !== 200) {
+      throw new Error(`blob get failed: ${res?.statusCode ?? "not found"}`);
+    }
+    const text = await new Response(res.stream).text();
+    return JSON.parse(text) as StoredDataset;
   }
   const raw = await fs.readFile(path.join(DATA_DIR, ref.id), "utf8");
   return JSON.parse(raw) as StoredDataset;
@@ -77,7 +82,7 @@ async function readJson(ref: VersionRef): Promise<StoredDataset> {
 async function writeJson(id: string, data: StoredDataset): Promise<void> {
   const body = JSON.stringify(data);
   if (useBlob()) {
-    await put(id, body, { access: "public", addRandomSuffix: false, contentType: "application/json" });
+    await put(id, body, { access: "private", addRandomSuffix: false, contentType: "application/json" });
     return;
   }
   const file = path.join(DATA_DIR, id);
@@ -87,7 +92,7 @@ async function writeJson(id: string, data: StoredDataset): Promise<void> {
 
 async function remove(ref: VersionRef): Promise<void> {
   if (useBlob()) {
-    await del(ref.url!);
+    await del(ref.id);
     return;
   }
   await fs.rm(path.join(DATA_DIR, ref.id), { force: true });
