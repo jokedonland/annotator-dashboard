@@ -289,3 +289,38 @@ describe("July 2026 export format (renamed lowercase headers)", () => {
     expect(r.skipped).toHaveLength(0);
   });
 });
+
+describe("combined (super-writer + reviewer) metrics", () => {
+  it("sums approved writes and approved reviews against a blended target", () => {
+    const m = computeUserMetrics(ds, BOB);
+    const all = m.combined.find((w) => w.window === "allTime")!;
+    // bob wrote t8 (approved) and reviewed t1, t2 (approved), t5 (approved,
+    // no review date → dated by written date), t6 (QA-approved); t9 is not
+    // approved → W=1, R=4, contributions=5
+    expect(all.approvedWrites).toBe(1);
+    expect(all.approvedReviews).toBe(4);
+    expect(all.contributions).toBe(5);
+    // expected hours = 2.5·1 + 1.5·4 = 8.5 → blended target 1.7/contribution
+    expect(all.expectedHours).toBeCloseTo(8.5);
+    expect(all.blendedTarget).toBeCloseTo(1.7);
+    expect(all.aht.value).toBeCloseTo(1.5 / 5);
+    expect(all.aht.devianceFromTarget).toBeCloseTo((1.5 / 5 - 1.7) / 1.7);
+  });
+
+  it("never double-counts: self rows are writes, not reviews", () => {
+    const m = computeUserMetrics(ds, CAROL);
+    const all = m.combined.find((w) => w.window === "allTime")!;
+    // carol's self row t4 is an approved write; her real review t8 is approved
+    expect(all.approvedWrites).toBe(1);
+    expect(all.approvedReviews).toBe(1);
+    expect(all.contributions).toBe(2);
+  });
+
+  it("zero contributions → null AHT and null blended target", () => {
+    const m = computeUserMetrics(ds, DAVE);
+    const all = m.combined.find((w) => w.window === "allTime")!;
+    expect(all.contributions).toBe(0);
+    expect(all.blendedTarget).toBeNull();
+    expect(all.aht.value).toBeNull();
+  });
+});

@@ -41,6 +41,26 @@ export interface ReviewerWindowMetrics {
   perTouchAht: RatioMetric; // hours ÷ total touches
 }
 
+/**
+ * Combined view for Reviewer + Super-Writer contractors: contributions to
+ * approved tasks in either capacity. Own approved writes and approved tasks
+ * they reviewed are disjoint sets (self rows are writes, never reviews), so
+ * the sum never double-counts. Judged against a blended target: expected
+ * hours = 2.5·writes + 1.5·reviews for the window's actual mix.
+ */
+export interface CombinedWindowMetrics {
+  window: Window["key"];
+  hours: number;
+  approvedWrites: number; // own tasks, by approvalDate
+  approvedReviews: number; // others' approved tasks they reviewed, by approvalDate
+  contributions: number; // sum of the above
+  expectedHours: number; // 2.5·W + 1.5·R
+  blendedTarget: number | null; // expected ÷ contributions
+  aht: RatioMetric; // hours ÷ contributions, deviance vs blended target
+  totalTouches: number; // review touches + own write attempts (all, not approved-only)
+  perTouchAht: RatioMetric; // hours ÷ total touches, deviance vs blended target
+}
+
 export interface QualityWindowMetrics {
   window: Window["key"];
   denominator: number; // written tasks with date_reviewed in window (self rows INCLUDED)
@@ -55,6 +75,7 @@ export interface UserMetrics {
   hasQaActivity: boolean;
   writer: WriterWindowMetrics[];
   reviewer: ReviewerWindowMetrics[];
+  combined: CombinedWindowMetrics[];
   quality: QualityWindowMetrics[];
   weeklyTrend: WeeklyPoint[];
   currentWeek: CurrentWeekProgress;
@@ -65,8 +86,10 @@ export interface WeeklyPoint {
   hours: number;
   approved: number; // writer denominator
   reviewed: number; // reviewer denominator (others' tasks)
+  approvedReviews: number; // others' approved tasks they reviewed
   writerAht: number | null;
   reviewerAht: number | null;
+  combinedAht: number | null; // hours ÷ (approved + approvedReviews)
 }
 
 export interface CurrentWeekProgress {
@@ -136,6 +159,39 @@ export function reviewerMetrics(ds: Dataset, email: string, w: Window): Reviewer
   };
 }
 
+export function combinedMetrics(ds: Dataset, email: string, w: Window): CombinedWindowMetrics {
+  const approvedWrites = ds.tasks.filter(
+    (t) => t.writerEmail === email && t.isApproved && inRange(t.approvalDate, w.start, w.end)
+  ).length;
+  const approvedReviews = ds.tasks.filter(
+    (t) =>
+      t.reviewerEmail === email &&
+      t.writerEmail !== email &&
+      t.isApproved &&
+      inRange(t.approvalDate, w.start, w.end)
+  ).length;
+  const contributions = approvedWrites + approvedReviews;
+  const expectedHours = TARGETS.Writer.aht * approvedWrites + TARGETS.Reviewer.aht * approvedReviews;
+  const blendedTarget = contributions > 0 ? expectedHours / contributions : null;
+  const hours = windowHours(ds, email, w);
+  const rm = reviewerMetrics(ds, email, w);
+  const totalTouches = rm.totalTouches;
+  // Deviance against the blended target for the window's actual write/review mix
+  const target = blendedTarget ?? TARGETS.Writer.aht;
+  return {
+    window: w.key,
+    hours,
+    approvedWrites,
+    approvedReviews,
+    contributions,
+    expectedHours,
+    blendedTarget,
+    aht: ratio(hours, contributions, target),
+    totalTouches,
+    perTouchAht: ratio(hours, totalTouches, target),
+  };
+}
+
 export function qualityMetrics(ds: Dataset, email: string, w: Window): QualityWindowMetrics {
   // The user's OWN written work that got reviewed in the window — self rows
   // included, the errors on them are real.
@@ -177,7 +233,16 @@ export function weeklyTrend(ds: Dataset, email: string): WeeklyPoint[] {
   const get = (weekStart: string): WeeklyPoint => {
     let p = byWeek.get(weekStart);
     if (!p) {
-      p = { weekStart, hours: 0, approved: 0, reviewed: 0, writerAht: null, reviewerAht: null };
+      p = {
+        weekStart,
+        hours: 0,
+        approved: 0,
+        reviewed: 0,
+        approvedReviews: 0,
+        writerAht: null,
+        reviewerAht: null,
+        combinedAht: null,
+      };
       byWeek.set(weekStart, p);
     }
     return p;
@@ -191,8 +256,9 @@ export function weeklyTrend(ds: Dataset, email: string): WeeklyPoint[] {
     if (t.writerEmail === email && t.isApproved && t.approvalDate) {
       get(mondayOf(t.approvalDate)).approved++;
     }
-    if (t.reviewerEmail === email && t.writerEmail !== email && t.dateReviewed) {
-      get(mondayOf(t.dateReviewed)).reviewed++;
+    if (t.reviewerEmail === email && t.writerEmail !== email) {
+      if (t.dateReviewed) get(mondayOf(t.dateReviewed)).reviewed++;
+      if (t.isApproved && t.approvalDate) get(mondayOf(t.approvalDate)).approvedReviews++;
     }
   }
 
@@ -200,6 +266,8 @@ export function weeklyTrend(ds: Dataset, email: string): WeeklyPoint[] {
   for (const p of points) {
     p.writerAht = p.approved > 0 ? p.hours / p.approved : null;
     p.reviewerAht = p.reviewed > 0 ? p.hours / p.reviewed : null;
+    const contrib = p.approved + p.approvedReviews;
+    p.combinedAht = contrib > 0 ? p.hours / contrib : null;
   }
   return points;
 }
@@ -224,6 +292,7 @@ export function computeUserMetrics(ds: Dataset, emailRaw: string): UserMetrics {
     hasQaActivity: hasQaActivity(ds.tasks),
     writer: ws.map((w) => writerMetrics(ds, email, w)),
     reviewer: ws.map((w) => reviewerMetrics(ds, email, w)),
+    combined: ws.map((w) => combinedMetrics(ds, email, w)),
     quality: ws.map((w) => qualityMetrics(ds, email, w)),
     weeklyTrend: weeklyTrend(ds, email),
     currentWeek: currentWeekProgress(ds, email),

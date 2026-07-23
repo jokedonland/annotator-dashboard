@@ -132,7 +132,7 @@ export function TrendChart({
           fontSize={10}
           fill="var(--ink-2)"
         >
-          target {target}
+          target {Number(target.toFixed(2))}
         </text>
         {/* x labels: first, last, and every ~4th */}
         {points.map((p, i) => {

@@ -42,6 +42,13 @@ export function Dashboard({
     if (data.reviews.length === 0 && data.writes.length > 0) return "writes";
     return isReviewer ? "reviews" : "writes";
   });
+  // AHT view: dual-role users default to the combined (blended-target) view.
+  const [ahtMode, setAhtMode] = useState<"combined" | "writes" | "reviews">(() => {
+    if (data.writes.length > 0 && data.reviews.length > 0) return "combined";
+    if (data.writes.length === 0 && data.reviews.length > 0) return "reviews";
+    if (data.reviews.length === 0 && data.writes.length > 0) return "writes";
+    return isReviewer ? "reviews" : "writes";
+  });
 
   async function logout() {
     await fetch("/api/logout", { method: "POST" });
@@ -120,7 +127,7 @@ export function Dashboard({
         ))}
       </div>
 
-      {tab === "AHT" && <AhtTab data={data} mode={taskMode} setMode={setTaskMode} />}
+      {tab === "AHT" && <AhtTab data={data} mode={ahtMode} setMode={setAhtMode} />}
       {tab === "Tasks" && (
         <TasksTab data={data} mode={taskMode} setMode={setTaskMode} />
       )}
@@ -137,37 +144,60 @@ function AhtTab({
   setMode,
 }: {
   data: DashboardData;
-  mode: "writes" | "reviews";
-  setMode: (m: "writes" | "reviews") => void;
+  mode: "combined" | "writes" | "reviews";
+  setMode: (m: "combined" | "writes" | "reviews") => void;
 }) {
   const m = data.metrics;
-  // The AHT view follows the same Writes/Reviews toggle as the Tasks tab, so a
-  // Reviewer-tagged super-writer who only writes still sees a real AHT.
-  const asReviewer = mode === "reviews";
   const dualRole = data.writes.length > 0 && data.reviews.length > 0;
-  const viewTarget = asReviewer ? TARGETS.Reviewer.aht : TARGETS.Writer.aht;
+  const allTimeCombined = m.combined.find((w) => w.window === "allTime")!;
 
-  const rows = (asReviewer ? m.reviewer : m.writer) as (WriterWindowMetrics | ReviewerWindowMetrics)[];
+  // Per-view target: combined uses the blended target for the user's actual
+  // write/review mix (2.5·W + 1.5·R hours expected).
+  const viewTarget =
+    mode === "combined"
+      ? allTimeCombined.blendedTarget ?? TARGETS.Writer.aht
+      : mode === "reviews"
+        ? TARGETS.Reviewer.aht
+        : TARGETS.Writer.aht;
 
   const trendPoints = m.weeklyTrend.map((p) => ({
     weekStart: p.weekStart,
-    aht: asReviewer ? p.reviewerAht : p.writerAht,
+    aht: mode === "combined" ? p.combinedAht : mode === "reviews" ? p.reviewerAht : p.writerAht,
     hours: p.hours,
-    count: asReviewer ? p.reviewed : p.approved,
+    count:
+      mode === "combined" ? p.approved + p.approvedReviews : mode === "reviews" ? p.reviewed : p.approved,
   }));
+
+  const denomLabel =
+    mode === "combined"
+      ? "approved writes + approved reviews"
+      : mode === "reviews"
+        ? "tasks reviewed"
+        : "approved tasks";
+
+  const MODE_LABELS = { combined: "Combined", writes: "As writer", reviews: "As reviewer" } as const;
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-borderc bg-surface px-4 py-3 text-sm">
         <span>
-          Your AHT target: <strong>{viewTarget} hrs</strong>
-          <span className="ml-2 text-xs text-muted">
-            hours ÷ {asReviewer ? "tasks reviewed" : "approved tasks"}
-          </span>
+          {mode === "combined" ? (
+            <>
+              Your blended AHT target: <strong>{viewTarget.toFixed(2)} hrs</strong>
+              <span className="ml-2 text-xs text-muted">
+                2.5 hrs per write · 1.5 hrs per review, weighted by your all-time mix
+              </span>
+            </>
+          ) : (
+            <>
+              Your AHT target: <strong>{viewTarget} hrs</strong>
+              <span className="ml-2 text-xs text-muted">hours ÷ {denomLabel}</span>
+            </>
+          )}
         </span>
         {dualRole && (
           <span className="inline-flex rounded-lg border border-borderc p-0.5" role="tablist">
-            {(["writes", "reviews"] as const).map((mo) => (
+            {(["combined", "writes", "reviews"] as const).map((mo) => (
               <button
                 key={mo}
                 role="tab"
@@ -177,7 +207,7 @@ function AhtTab({
                   mode === mo ? "bg-series-1 text-white" : "text-ink-2 hover:text-ink"
                 }`}
               >
-                {mo === "writes" ? "As writer" : "As reviewer"}
+                {MODE_LABELS[mo]}
               </button>
             ))}
           </span>
@@ -185,22 +215,36 @@ function AhtTab({
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {rows.map((w) => {
+        {(mode === "combined"
+          ? m.combined
+          : ((mode === "reviews" ? m.reviewer : m.writer) as (
+              | WriterWindowMetrics
+              | ReviewerWindowMetrics
+            )[])
+        ).map((w) => {
           const st = devianceStatus(w.aht.devianceFromTarget);
+          const mix =
+            mode === "combined" && "contributions" in w && w.contributions > 0
+              ? `${w.approvedWrites} writes + ${w.approvedReviews} reviews`
+              : undefined;
           return (
             <StatCard
               key={`aht-${w.window}`}
               label={`AHT — ${WINDOW_LABELS[w.window]}`}
               value={fmtHours(w.aht.value)}
               unit="hrs"
-              badge={
-                st ? { text: fmtPctSigned(w.aht.devianceFromTarget), status: st } : null
-              }
-              hint={w.aht.value === null ? "no data in this period" : undefined}
+              badge={st ? { text: fmtPctSigned(w.aht.devianceFromTarget), status: st } : null}
+              hint={w.aht.value === null ? "no data in this period" : mix}
             />
           );
         })}
-        {rows.map((w) => {
+        {(mode === "combined"
+          ? m.combined
+          : ((mode === "reviews" ? m.reviewer : m.writer) as (
+              | WriterWindowMetrics
+              | ReviewerWindowMetrics
+            )[])
+        ).map((w) => {
           const st = devianceStatus(w.perTouchAht.devianceFromTarget);
           return (
             <StatCard
@@ -218,13 +262,11 @@ function AhtTab({
       </div>
 
       <div className="rounded-xl border border-borderc bg-surface p-4">
-        <h2 className="mb-2 text-sm font-semibold">
-          Weekly AHT ({asReviewer ? "hours ÷ tasks reviewed" : "hours ÷ approved tasks"})
-        </h2>
+        <h2 className="mb-2 text-sm font-semibold">Weekly AHT (hours ÷ {denomLabel})</h2>
         <TrendChart
           points={trendPoints}
           target={viewTarget}
-          countLabel={asReviewer ? "reviewed" : "approved"}
+          countLabel={mode === "combined" ? "contributions" : mode === "reviews" ? "reviewed" : "approved"}
         />
       </div>
     </div>

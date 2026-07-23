@@ -30,7 +30,7 @@ export function StatCard({
           <span className="font-normal opacity-80">{badge.suffix ?? "vs target"}</span>
         </span>
       )}
-      {!badge && hint && <div className="mt-2 text-xs text-muted">{hint}</div>}
+      {hint && <div className="mt-2 text-xs text-muted">{hint}</div>}
     </div>
   );
 }
