@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardData } from "@/lib/view";
+import { TARGETS } from "@/lib/types";
 import { WriterWindowMetrics, ReviewerWindowMetrics } from "@/lib/metrics";
 import { StatCard } from "./StatCard";
 import { TrendChart } from "./TrendChart";
@@ -119,7 +120,7 @@ export function Dashboard({
         ))}
       </div>
 
-      {tab === "AHT" && <AhtTab data={data} />}
+      {tab === "AHT" && <AhtTab data={data} mode={taskMode} setMode={setTaskMode} />}
       {tab === "Tasks" && (
         <TasksTab data={data} mode={taskMode} setMode={setTaskMode} />
       )}
@@ -130,26 +131,57 @@ export function Dashboard({
 
 /* ================= AHT tab ================= */
 
-function AhtTab({ data }: { data: DashboardData }) {
-  const isReviewer = data.role === "Reviewer";
+function AhtTab({
+  data,
+  mode,
+  setMode,
+}: {
+  data: DashboardData;
+  mode: "writes" | "reviews";
+  setMode: (m: "writes" | "reviews") => void;
+}) {
   const m = data.metrics;
+  // The AHT view follows the same Writes/Reviews toggle as the Tasks tab, so a
+  // Reviewer-tagged super-writer who only writes still sees a real AHT.
+  const asReviewer = mode === "reviews";
+  const dualRole = data.writes.length > 0 && data.reviews.length > 0;
+  const viewTarget = asReviewer ? TARGETS.Reviewer.aht : TARGETS.Writer.aht;
 
-  const rows = (isReviewer ? m.reviewer : m.writer) as (WriterWindowMetrics | ReviewerWindowMetrics)[];
+  const rows = (asReviewer ? m.reviewer : m.writer) as (WriterWindowMetrics | ReviewerWindowMetrics)[];
 
   const trendPoints = m.weeklyTrend.map((p) => ({
     weekStart: p.weekStart,
-    aht: isReviewer ? p.reviewerAht : p.writerAht,
+    aht: asReviewer ? p.reviewerAht : p.writerAht,
     hours: p.hours,
-    count: isReviewer ? p.reviewed : p.approved,
+    count: asReviewer ? p.reviewed : p.approved,
   }));
 
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-borderc bg-surface px-4 py-3 text-sm">
-        Your AHT target: <strong>{data.targets.aht} hrs</strong>
-        <span className="ml-2 text-xs text-muted">
-          hours ÷ {isReviewer ? "tasks reviewed" : "approved tasks"}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-borderc bg-surface px-4 py-3 text-sm">
+        <span>
+          Your AHT target: <strong>{viewTarget} hrs</strong>
+          <span className="ml-2 text-xs text-muted">
+            hours ÷ {asReviewer ? "tasks reviewed" : "approved tasks"}
+          </span>
         </span>
+        {dualRole && (
+          <span className="inline-flex rounded-lg border border-borderc p-0.5" role="tablist">
+            {(["writes", "reviews"] as const).map((mo) => (
+              <button
+                key={mo}
+                role="tab"
+                aria-selected={mode === mo}
+                onClick={() => setMode(mo)}
+                className={`rounded-md px-3 py-1 text-xs font-medium ${
+                  mode === mo ? "bg-series-1 text-white" : "text-ink-2 hover:text-ink"
+                }`}
+              >
+                {mo === "writes" ? "As writer" : "As reviewer"}
+              </button>
+            ))}
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -187,12 +219,12 @@ function AhtTab({ data }: { data: DashboardData }) {
 
       <div className="rounded-xl border border-borderc bg-surface p-4">
         <h2 className="mb-2 text-sm font-semibold">
-          Weekly AHT ({isReviewer ? "hours ÷ tasks reviewed" : "hours ÷ approved tasks"})
+          Weekly AHT ({asReviewer ? "hours ÷ tasks reviewed" : "hours ÷ approved tasks"})
         </h2>
         <TrendChart
           points={trendPoints}
-          target={data.targets.aht}
-          countLabel={isReviewer ? "reviewed" : "approved"}
+          target={viewTarget}
+          countLabel={asReviewer ? "reviewed" : "approved"}
         />
       </div>
     </div>
