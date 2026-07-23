@@ -43,7 +43,9 @@ export default async function Home(props: {
 
   return (
     <main className="flex-1">
+      {/* key resets tab/toggle state when an admin switches viewed user */}
       <Dashboard
+        key={data.email}
         data={data}
         viewer={{ email: session.email, isAdmin: session.isAdmin }}
         directory={directory}

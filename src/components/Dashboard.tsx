@@ -34,9 +34,13 @@ export function Dashboard({
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]>("AHT");
   const isReviewer = data.role === "Reviewer";
-  const [taskMode, setTaskMode] = useState<"writes" | "reviews">(
-    isReviewer && data.reviews.length > 0 ? "reviews" : "writes"
-  );
+  // Default to the role-appropriate view, but never an empty one when the
+  // other side has rows (a Reviewer-tagged super-writer may only have writes).
+  const [taskMode, setTaskMode] = useState<"writes" | "reviews">(() => {
+    if (data.writes.length === 0 && data.reviews.length > 0) return "reviews";
+    if (data.reviews.length === 0 && data.writes.length > 0) return "writes";
+    return isReviewer ? "reviews" : "writes";
+  });
 
   async function logout() {
     await fetch("/api/logout", { method: "POST" });
