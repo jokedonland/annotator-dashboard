@@ -100,6 +100,8 @@ export interface DataHealth {
   }[];
   attemptOutliers: { taskId: string; writerEmail: string; attempts: number }[];
   approvedWithoutReviewDate: string[]; // task ids
+  /** Rows with a TASK_ID but no writer — tasks not yet claimed/written. */
+  unclaimedTaskRows: number;
   emailsInTasksNotInRoles: string[];
   emailsInHoursNotInRoles: string[];
   emailsInRolesNotInData: string[];

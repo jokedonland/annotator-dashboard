@@ -15,10 +15,16 @@ export function normEmail(raw: string | null | undefined): string {
   return (raw ?? "").trim().toLowerCase();
 }
 
+/**
+ * Header names are matched case-insensitively (trimmed, lowercased): real
+ * exports have renamed columns between dumps (ERROR_CATEGORY → error_category),
+ * so every field lookup in this file uses the lowercase name.
+ */
 function parseCsv(text: string): Record<string, string>[] {
   const res = Papa.parse<Record<string, string>>(text, {
     header: true,
     skipEmptyLines: "greedy",
+    transformHeader: (h) => h.trim().toLowerCase(),
   });
   return res.data;
 }
@@ -71,22 +77,34 @@ function yn(raw: string | undefined): boolean {
 
 export function parseTasks(
   text: string
-): { tasks: Task[]; skipped: { line: number; reason: string }[]; unparseable: { taskId: string; raw: string }[] } {
+): {
+  tasks: Task[];
+  skipped: { line: number; reason: string }[];
+  unparseable: { taskId: string; raw: string }[];
+  unclaimed: number;
+} {
   const rows = parseCsv(text);
   const tasks: Task[] = [];
   const skipped: { line: number; reason: string }[] = [];
   const unparseable: { taskId: string; raw: string }[] = [];
+  let unclaimed = 0;
 
   rows.forEach((row, i) => {
-    const taskId = (row["TASK_ID"] ?? "").trim();
+    const taskId = (row["task_id"] ?? "").trim();
     const writerEmail = normEmail(row["writer_email"]);
-    if (!taskId || !writerEmail) {
-      skipped.push({ line: i + 2, reason: !taskId ? "missing TASK_ID" : "missing writer_email" });
+    if (taskId && !writerEmail) {
+      // Task exists in the pool but nobody has written it yet — expected in
+      // newer dumps, counted but not listed as malformed.
+      unclaimed++;
+      return;
+    }
+    if (!taskId) {
+      skipped.push({ line: i + 2, reason: "missing TASK_ID" });
       return;
     }
     const reviewerEmail = normEmail(row["reviewer_email"]) || null;
-    const { errors, failed } = parseErrorCategory(row["ERROR_CATEGORY"]);
-    if (failed) unparseable.push({ taskId, raw: row["ERROR_CATEGORY"] ?? "" });
+    const { errors, failed } = parseErrorCategory(row["error_category"]);
+    if (failed) unparseable.push({ taskId, raw: row["error_category"] ?? "" });
 
     const approved = yn(row["approved"]);
     const qaApproved = yn(row["qa_approved"]);
@@ -105,9 +123,9 @@ export function parseTasks(
 
     tasks.push({
       taskId,
-      writerClaimTime: num(row["WRITER_CLAIM_TIME"]),
-      reviewerClaimTime: num(row["REVIEWER_CLAIM_TIME"]),
-      qaClaimTime: num(row["QA_CLAIM_TIME"]),
+      writerClaimTime: num(row["writer_claim_time"]),
+      reviewerClaimTime: num(row["reviewer_claim_time"]),
+      qaClaimTime: num(row["qa_claim_time"]),
       writerEmail,
       reviewerEmail,
       qaEmail: normEmail(row["qa_email"]) || null,
@@ -124,18 +142,18 @@ export function parseTasks(
       approved,
       qaApproved,
       errors,
-      errorCategoryRaw: row["ERROR_CATEGORY"] ?? "",
+      errorCategoryRaw: row["error_category"] ?? "",
       errorParseFailed: failed,
-      fieldDomain: (row["FIELD_DOMAIN"] ?? "").trim(),
-      numSources: (row["NUM_SOURCES"] ?? "").trim(),
-      listLength: (row["LIST_LENGTH"] ?? "").trim(),
+      fieldDomain: (row["field_domain"] ?? "").trim(),
+      numSources: (row["num_sources"] ?? "").trim(),
+      listLength: (row["list_length"] ?? "").trim(),
       isSelfReview: reviewerEmail !== null && reviewerEmail === writerEmail,
       isApproved,
       approvalDate,
     });
   });
 
-  return { tasks, skipped, unparseable };
+  return { tasks, skipped, unparseable, unclaimed };
 }
 
 export function parseHours(
@@ -146,8 +164,8 @@ export function parseHours(
   const skipped: { line: number; reason: string }[] = [];
 
   rows.forEach((row, i) => {
-    const email = normEmail(row["MERCOR_EXPERT_EMAIL"]);
-    const date = parseSlashDate(row["Date (Add)"]);
+    const email = normEmail(row["mercor_expert_email"]);
+    const date = parseSlashDate(row["date (add)"]);
     const total = num(row["total_hours_all_time"]);
     if (!email || !date || total === null) {
       skipped.push({
@@ -157,8 +175,8 @@ export function parseHours(
       return;
     }
     snapshots.push({
-      userId: (row["USERID"] ?? "").trim(),
-      userName: (row["USER_NAME"] ?? "").trim(),
+      userId: (row["userid"] ?? "").trim(),
+      userName: (row["user_name"] ?? "").trim(),
       email,
       totalHoursAllTime: total,
       totalHoursInPeriod: num(row["total_hours_in_period"]) ?? 0,
@@ -189,23 +207,23 @@ export function parseRoles(
   const skipped: { line: number; reason: string }[] = [];
 
   rows.forEach((row, i) => {
-    const contractorEmail = normEmail(row["Contractor Email"]);
+    const contractorEmail = normEmail(row["contractor email"]);
     if (!contractorEmail) {
       skipped.push({ line: i + 2, reason: "missing Contractor Email" });
       return;
     }
-    const tags = (row["Tags"] ?? "")
+    const tags = (row["tags"] ?? "")
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean);
     const { role, isOnboarding } = resolveRole(tags);
     roles.push({
-      name: (row["Name"] ?? "").trim(),
-      personalEmail: (row["Email"] ?? "").trim(),
+      name: (row["name"] ?? "").trim(),
+      personalEmail: (row["email"] ?? "").trim(),
       contractorEmail,
-      helper: (row["Helper"] ?? "").trim(),
+      helper: (row["helper"] ?? "").trim(),
       tags,
-      contractStatus: (row["Contract Status"] ?? "").trim(),
+      contractStatus: (row["contract status"] ?? "").trim(),
       resolvedRole: role,
       isOnboarding,
     });
@@ -240,6 +258,7 @@ export function buildDataset(tasksCsv: string, hoursCsv: string, rolesCsv: strin
     attemptOutliers: t.tasks
       .filter((task) => task.numWriterAttempts > ATTEMPT_OUTLIER_THRESHOLD)
       .map((task) => ({ taskId: task.taskId, writerEmail: task.writerEmail, attempts: task.numWriterAttempts })),
+    unclaimedTaskRows: t.unclaimed,
     approvedWithoutReviewDate: t.tasks
       .filter((task) => task.isApproved && !task.dateReviewed)
       .map((task) => task.taskId),

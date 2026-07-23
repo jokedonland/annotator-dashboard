@@ -76,7 +76,8 @@ export default async function HealthPage() {
         {ds.tasks.length.toLocaleString()} tasks · {ds.hoursSnapshots.length.toLocaleString()} hours rows ·{" "}
         {ds.roles.length} roles · data through <strong>{fmtDayYear(ds.dataThrough)}</strong>.{" "}
         Self-review rows: {selfRows.toLocaleString()} ({((selfRows / Math.max(1, ds.tasks.length)) * 100).toFixed(1)}%) ·
-        awaiting review: {blankRev} ({((blankRev / Math.max(1, ds.tasks.length)) * 100).toFixed(1)}%).
+        awaiting review: {blankRev} ({((blankRev / Math.max(1, ds.tasks.length)) * 100).toFixed(1)}%) ·
+        unclaimed tasks in pool: {h.unclaimedTaskRows.toLocaleString()}.
       </p>
 
       <div className="space-y-3">

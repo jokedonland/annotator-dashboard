@@ -10,12 +10,11 @@ export const maxDuration = 300; // first users.csv ingest bcrypts every row
 type FileKind = "tasks" | "hours" | "roles" | "users";
 
 function sniffKind(text: string): FileKind | null {
-  const header = text.slice(0, 2000).split("\n")[0] ?? "";
-  if (header.includes("TASK_ID")) return "tasks";
-  if (header.includes("MERCOR_EXPERT_EMAIL")) return "hours";
-  if (header.includes("Contractor Email")) return "roles";
-  const cols = header.toLowerCase();
-  if (cols.includes("email") && cols.includes("password")) return "users";
+  const header = (text.slice(0, 2000).split("\n")[0] ?? "").toLowerCase();
+  if (header.includes("task_id")) return "tasks";
+  if (header.includes("mercor_expert_email")) return "hours";
+  if (header.includes("contractor email")) return "roles";
+  if (header.includes("email") && header.includes("password")) return "users";
   return null;
 }
 

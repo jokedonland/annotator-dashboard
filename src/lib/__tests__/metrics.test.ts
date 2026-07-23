@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildDataset, parseErrorCategory, resolveRole } from "../parse";
+import { buildDataset, parseErrorCategory, parseTasks, resolveRole } from "../parse";
 import { toLaDate, mondayOf, addDays, windows } from "../dates";
 import { computeUserMetrics, hasQaActivity } from "../metrics";
 import { TASKS_CSV, HOURS_CSV, ROLES_CSV, ALICE, BOB, CAROL, DAVE } from "./fixtures";
@@ -267,5 +267,22 @@ describe("QA activity detection", () => {
       ROLES_CSV
     );
     expect(hasQaActivity(noQa.tasks)).toBe(false);
+  });
+});
+
+describe("July 2026 export format (renamed lowercase headers)", () => {
+  const NEW_FORMAT_CSV = [
+    "TASK_ID,writer_email,writer_name,reviewer_email,reviewer_name,qa_email,qa_name,date_written,date_reviewed,date_qa_reviewed,num_writer_attempts,approved,qa_approved,error_category,field_domain,num_sources,list_length",
+    'task_new1,alice@mercor.expert,Alice,bob@mercor.expert,Bob,,,2026-07-10 18:00:00+00,2026-07-10 19:00:00+00,,2,y,n,"[""Objectivity - major""]",Travel,3,LL2',
+    "task_pool1,,,,,,,,,,,,,,,,", // unclaimed task: id only
+  ].join("\n");
+
+  it("parses errors from lowercase error_category and counts unclaimed rows", () => {
+    const r = parseTasks(NEW_FORMAT_CSV);
+    expect(r.tasks).toHaveLength(1);
+    expect(r.tasks[0].errors).toEqual([{ type: "Objectivity", severity: "major" }]);
+    expect(r.tasks[0].dateWritten).toBe("2026-07-10");
+    expect(r.unclaimed).toBe(1);
+    expect(r.skipped).toHaveLength(0);
   });
 });
