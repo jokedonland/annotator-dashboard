@@ -103,12 +103,3 @@ export function hoursInWindow(
   return sum;
 }
 
-/** All-time hours = the user's latest total_hours_all_time. */
-export function allTimeHours(snapshots: HoursSnapshot[], email: string): number {
-  let latest: HoursSnapshot | null = null;
-  for (const s of snapshots) {
-    if (s.email !== email) continue;
-    if (!latest || s.date > latest.date) latest = s;
-  }
-  return latest ? latest.totalHoursAllTime : 0;
-}

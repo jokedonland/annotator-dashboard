@@ -29,6 +29,9 @@ approved = `approved OR qa_approved` counted once; super-writer self-rows count
 as writes and quality but never as reviews; review touches = `num_writer_attempts`;
 reviewer AHT = hours ÷ all tasks reviewed; hours reconstructed from cumulative
 snapshots (first row = `hours_last_1d`, negative diffs clamped and reported).
+All windows — including all-time — sum the reconstructed dailies, so "all-time"
+means "over the data currently loaded": dumps have shipped with partial history,
+and dividing lifetime cumulative hours by a partial task window is meaningless.
 
 ## Local development
 

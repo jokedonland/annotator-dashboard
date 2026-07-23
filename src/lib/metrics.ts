@@ -1,6 +1,6 @@
 import { Dataset, Task, TARGETS, KNOWN_ERROR_TYPES } from "./types";
 import { Window, windows, mondayOf, addDays, inRange } from "./dates";
-import { hoursInWindow, allTimeHours } from "./hours";
+import { hoursInWindow } from "./hours";
 
 export interface RatioMetric {
   numeratorHours: number;
@@ -82,9 +82,11 @@ export function hasQaActivity(tasks: Task[]): boolean {
 }
 
 function windowHours(ds: Dataset, email: string, w: Window): number {
-  // All-time hours come from the latest cumulative snapshot (authoritative);
-  // bounded windows sum the reconstructed dailies.
-  if (w.start === null) return allTimeHours(ds.hoursSnapshots, email);
+  // Every window — all-time included — sums the reconstructed dailies, so
+  // "all-time" means "over the data currently loaded" and stays consistent
+  // with the task dump's coverage even when dumps carry partial history.
+  // (The latest cumulative total_hours_all_time reaches back before the task
+  // data starts, which made all-time AHT meaningless on truncated dumps.)
   return hoursInWindow(ds.dailyHours, email, w.start, w.end);
 }
 

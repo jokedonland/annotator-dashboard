@@ -133,11 +133,13 @@ describe("writer metrics (alice)", () => {
     expect(byKey(m.writer, "last2w").totalAttempts).toBe(10); // all but t6 (7/01)
   });
 
-  it("computes AHT and deviance; all-time hours from latest cumulative", () => {
+  it("computes AHT and deviance; all-time hours from the daily reconstruction", () => {
     const all = byKey(m.writer, "allTime");
-    expect(all.hours).toBe(11); // latest total_hours_all_time, not the sum
-    expect(all.aht.value).toBeCloseTo(11 / 4);
-    expect(all.aht.devianceFromTarget).toBeCloseTo((11 / 4 - 2.5) / 2.5);
+    // Sum of reconstructed dailies (2+2+0), NOT the latest cumulative (11):
+    // all-time must stay consistent with the loaded data's coverage.
+    expect(all.hours).toBe(4);
+    expect(all.aht.value).toBeCloseTo(4 / 4);
+    expect(all.aht.devianceFromTarget).toBeCloseTo((4 / 4 - 2.5) / 2.5);
     const w3 = byKey(m.writer, "last3d");
     expect(w3.hours).toBe(4); // 2+2+0 reconstructed dailies
     expect(w3.aht.value).toBeCloseTo(4 / 1);
@@ -189,9 +191,10 @@ describe("reviewer metrics (bob)", () => {
 
   it("AHT divides hours by ALL tasks reviewed (confirmed choice)", () => {
     const all = byKey(m.reviewer, "allTime");
-    expect(all.aht.value).toBeCloseTo(6 / 4);
-    expect(all.aht.devianceFromTarget).toBeCloseTo(0); // exactly on the 1.5 target
-    expect(all.perTouchAht.value).toBeCloseTo(6 / 8);
+    // bob's single snapshot reconstructs to 1.5 daily hours (hours_last_1d)
+    expect(all.aht.value).toBeCloseTo(1.5 / 4);
+    expect(all.aht.devianceFromTarget).toBeCloseTo((1.5 / 4 - 1.5) / 1.5);
+    expect(all.perTouchAht.value).toBeCloseTo(1.5 / 8);
   });
 });
 
