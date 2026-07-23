@@ -5,6 +5,7 @@ import { TaskRowView } from "@/lib/view";
 import { fmtDay } from "./format";
 
 const PAGE_SIZE = 25;
+const TASK_URL_BASE = "https://studio.mercor.com/annotator/tasks/";
 
 type SortKey = "date" | "attempts" | "approved";
 
@@ -126,7 +127,15 @@ export function TaskTable({
               <tr key={r.taskId} className="border-b border-grid last:border-0">
                 <td className="px-3 py-2 font-mono text-xs">
                   <span className="inline-flex items-center gap-1">
-                    {r.taskId.slice(0, 13)}…
+                    <a
+                      href={`${TASK_URL_BASE}${encodeURIComponent(r.taskId)}/`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Open ${r.taskId} in Mercor Studio`}
+                      className="text-series-1 hover:underline"
+                    >
+                      {r.taskId.slice(0, 13)}…
+                    </a>
                     <button
                       onClick={() => copy(r.taskId)}
                       title="Copy full task id"
