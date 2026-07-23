@@ -15,6 +15,8 @@
 
   --series-1: #2a78d6; /* categorical slot 1 (blue) */
   --series-1-track: #cde2fb; /* sequential step 100 — meter track */
+  --series-2: #eb6834; /* categorical slot 2 (orange) */
+  --tint-series-2: rgba(235, 104, 52, 0.14);
 
   --status-good: #0ca30c;
   --status-warning: #fab219;
@@ -42,6 +44,8 @@
 
     --series-1: #3987e5;
     --series-1-track: #0d366b; /* sequential step 700 — dark meter track, recessive */
+    --series-2: #d95926;
+    --tint-series-2: rgba(217, 89, 38, 0.22);
 
     --success-text: #0ca30c;
 
@@ -62,6 +66,8 @@
   --color-borderc: var(--border);
   --color-series-1: var(--series-1);
   --color-series-1-track: var(--series-1-track);
+  --color-series-2: var(--series-2);
+  --color-tint-series-2: var(--tint-series-2);
   --color-good: var(--status-good);
   --color-warning: var(--status-warning);
   --color-serious: var(--status-serious);

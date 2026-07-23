@@ -37,7 +37,8 @@ export function Dashboard({
   const isReviewer = data.role === "Reviewer";
   // Default to the role-appropriate view, but never an empty one when the
   // other side has rows (a Reviewer-tagged super-writer may only have writes).
-  const [taskMode, setTaskMode] = useState<"writes" | "reviews">(() => {
+  const [taskMode, setTaskMode] = useState<"all" | "writes" | "reviews">(() => {
+    if (data.writes.length > 0 && data.reviews.length > 0) return "all";
     if (data.writes.length === 0 && data.reviews.length > 0) return "reviews";
     if (data.reviews.length === 0 && data.writes.length > 0) return "writes";
     return isReviewer ? "reviews" : "writes";
@@ -281,12 +282,16 @@ function TasksTab({
   setMode,
 }: {
   data: DashboardData;
-  mode: "writes" | "reviews";
-  setMode: (m: "writes" | "reviews") => void;
+  mode: "all" | "writes" | "reviews";
+  setMode: (m: "all" | "writes" | "reviews") => void;
 }) {
   const isReviewer = data.role === "Reviewer";
   const m = data.metrics;
   const dualRole = data.writes.length > 0 && data.reviews.length > 0;
+  // Merged view, newest first regardless of kind
+  const allRows = [...data.writes, ...data.reviews].sort((a, b) =>
+    (b.dateRaw || "").localeCompare(a.dateRaw || "")
+  );
 
   const progress = isReviewer ? m.currentWeek.touchesThisWeek : m.currentWeek.approvedThisWeek;
   const pctDone = Math.min(1, progress / data.targets.output);
@@ -320,7 +325,7 @@ function TasksTab({
 
       {dualRole && (
         <div className="inline-flex rounded-lg border border-borderc bg-surface p-0.5" role="tablist">
-          {(["writes", "reviews"] as const).map((mo) => (
+          {(["all", "writes", "reviews"] as const).map((mo) => (
             <button
               key={mo}
               role="tab"
@@ -330,7 +335,13 @@ function TasksTab({
                 mode === mo ? "bg-series-1 text-white" : "text-ink-2 hover:text-ink"
               }`}
             >
-              {mo} ({mo === "writes" ? data.writes.length : data.reviews.length})
+              {mo} (
+              {mo === "all"
+                ? allRows.length
+                : mo === "writes"
+                  ? data.writes.length
+                  : data.reviews.length}
+              )
             </button>
           ))}
         </div>
@@ -348,19 +359,33 @@ function TasksTab({
                 hint={w.tasksWritten === 0 ? "no data in this period" : undefined}
               />
             ))
-          : m.reviewer.map((w) => (
-              <StatCard
-                key={w.window}
-                label={WINDOW_LABELS[w.window]}
-                value={`${w.tasksReviewed}`}
-                unit={`reviewed · ${w.totalTouches} touches`}
-                hint={w.tasksReviewed === 0 ? "no data in this period" : undefined}
-              />
-            ))}
+          : mode === "reviews"
+            ? m.reviewer.map((w) => (
+                <StatCard
+                  key={w.window}
+                  label={WINDOW_LABELS[w.window]}
+                  value={`${w.tasksReviewed}`}
+                  unit={`reviewed · ${w.totalTouches} touches`}
+                  hint={w.tasksReviewed === 0 ? "no data in this period" : undefined}
+                />
+              ))
+            : m.writer.map((w, i) => {
+                const rv = m.reviewer[i];
+                const total = w.tasksWritten + rv.tasksReviewed;
+                return (
+                  <StatCard
+                    key={w.window}
+                    label={WINDOW_LABELS[w.window]}
+                    value={`${total}`}
+                    unit={`${w.tasksWritten} written · ${rv.tasksReviewed} reviewed`}
+                    hint={total === 0 ? "no data in this period" : undefined}
+                  />
+                );
+              })}
       </div>
 
       <TaskTable
-        rows={mode === "writes" ? data.writes : data.reviews}
+        rows={mode === "all" ? allRows : mode === "writes" ? data.writes : data.reviews}
         mode={mode}
         hasQaActivity={data.hasQaActivity}
       />

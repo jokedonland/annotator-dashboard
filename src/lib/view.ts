@@ -5,6 +5,7 @@ import { normEmail } from "./parse";
 /** Row shape the task table renders — serializable, no Dataset reference. */
 export interface TaskRowView {
   taskId: string;
+  kind: "write" | "review";
   date: string | null; // date_written (writes view) or date_reviewed (reviews view)
   dateRaw: string;
   reviewed: boolean;
@@ -56,6 +57,7 @@ export function buildDashboardData(ds: Dataset, emailRaw: string): DashboardData
     .filter((t) => t.writerEmail === email)
     .map((t) => ({
       taskId: t.taskId,
+      kind: "write" as const,
       date: t.dateWritten,
       dateRaw: t.dateWrittenRaw,
       reviewed: t.dateReviewed !== null && t.reviewerEmail !== null,
@@ -72,6 +74,7 @@ export function buildDashboardData(ds: Dataset, emailRaw: string): DashboardData
     .filter((t) => t.reviewerEmail === email && t.writerEmail !== email)
     .map((t) => ({
       taskId: t.taskId,
+      kind: "review" as const,
       date: t.dateReviewed,
       dateRaw: t.dateReviewedRaw,
       reviewed: t.dateReviewed !== null,

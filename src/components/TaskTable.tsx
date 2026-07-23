@@ -17,13 +17,25 @@ function YesNo({ v, dash }: { v: boolean; dash?: boolean }) {
   );
 }
 
+function KindChip({ kind }: { kind: "write" | "review" }) {
+  return kind === "write" ? (
+    <span className="inline-flex items-center rounded-full bg-series-1/10 px-1.5 py-0.5 text-[11px] font-medium text-series-1">
+      Write
+    </span>
+  ) : (
+    <span className="inline-flex items-center rounded-full bg-tint-series-2 px-1.5 py-0.5 text-[11px] font-medium text-series-2">
+      Review
+    </span>
+  );
+}
+
 export function TaskTable({
   rows,
   mode,
   hasQaActivity,
 }: {
   rows: TaskRowView[];
-  mode: "writes" | "reviews";
+  mode: "all" | "writes" | "reviews";
   hasQaActivity: boolean;
 }) {
   const [page, setPage] = useState(0);
@@ -63,10 +75,13 @@ export function TaskTable({
   const arrow = (key: SortKey) =>
     sort.key === key ? (sort.dir === -1 ? " ↓" : " ↑") : "";
 
+  const showType = mode === "all";
+  const showWriter = mode !== "writes";
+
   if (rows.length === 0) {
     return (
       <div className="flex h-32 items-center justify-center rounded-xl border border-borderc bg-surface text-sm text-muted">
-        No {mode === "writes" ? "written tasks" : "reviews"} yet
+        No {mode === "writes" ? "written tasks" : mode === "reviews" ? "reviews" : "tasks"} yet
       </div>
     );
   }
@@ -74,17 +89,18 @@ export function TaskTable({
   return (
     <div className="rounded-xl border border-borderc bg-surface">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-sm">
+        <table className="w-full min-w-[860px] text-sm">
           <thead>
             <tr className="border-b border-grid text-left text-xs text-ink-2">
               <th className="px-3 py-2.5 font-medium">Task ID</th>
+              {showType && <th className="px-3 py-2.5 font-medium">Type</th>}
               <th className="px-3 py-2.5 font-medium">
                 <button onClick={() => toggleSort("date")} className="hover:text-ink">
-                  {mode === "writes" ? "Written" : "Reviewed"}
+                  {mode === "writes" ? "Written" : mode === "reviews" ? "Reviewed" : "Date"}
                   {arrow("date")}
                 </button>
               </th>
-              {mode === "reviews" && <th className="px-3 py-2.5 font-medium">Writer</th>}
+              {showWriter && <th className="px-3 py-2.5 font-medium">Writer</th>}
               <th className="px-3 py-2.5 font-medium">Reviewed?</th>
               <th className="px-3 py-2.5 font-medium">Errors</th>
               <th className="px-3 py-2.5 font-medium">
@@ -121,11 +137,18 @@ export function TaskTable({
                     </button>
                   </span>
                 </td>
+                {showType && (
+                  <td className="px-3 py-2">
+                    <KindChip kind={r.kind} />
+                  </td>
+                )}
                 <td className="px-3 py-2 whitespace-nowrap" style={{ fontVariantNumeric: "tabular-nums" }}>
                   {fmtDay(r.date)}
                 </td>
-                {mode === "reviews" && (
-                  <td className="max-w-40 truncate px-3 py-2 text-ink-2">{r.writerName}</td>
+                {showWriter && (
+                  <td className="max-w-40 truncate px-3 py-2 text-ink-2">
+                    {r.kind === "review" ? r.writerName : <span className="text-muted">—</span>}
+                  </td>
                 )}
                 <td className="px-3 py-2">
                   <YesNo v={r.reviewed} />
