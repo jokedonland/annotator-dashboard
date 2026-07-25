@@ -186,7 +186,7 @@ function AhtTab({
             <>
               Your blended AHT target: <strong>{viewTarget.toFixed(2)} hrs</strong>
               <span className="ml-2 text-xs text-muted">
-                2.5 hrs per write · 1.5 hrs per review, weighted by your all-time mix
+                2.5 hrs per approved write · 1.5 hrs per approved review, weighted by your all-time mix
               </span>
             </>
           ) : (
@@ -226,14 +226,21 @@ function AhtTab({
           const st = devianceStatus(w.aht.devianceFromTarget);
           const mix =
             mode === "combined" && "contributions" in w && w.contributions > 0
-              ? `${w.approvedWrites} writes + ${w.approvedReviews} reviews`
+              ? `${w.approvedWrites} approved writes + ${w.approvedReviews} approved reviews`
               : undefined;
+          // The unit names the denominator so "approved only" is never in doubt
+          const unit =
+            mode === "combined"
+              ? "hrs / approved contribution"
+              : mode === "reviews"
+                ? "hrs / task reviewed"
+                : "hrs / approved task";
           return (
             <StatCard
               key={`aht-${w.window}`}
               label={`AHT — ${WINDOW_LABELS[w.window]}`}
               value={fmtHours(w.aht.value)}
-              unit="hrs"
+              unit={unit}
               badge={st ? { text: fmtPctSigned(w.aht.devianceFromTarget), status: st } : null}
               hint={w.aht.value === null ? "no data in this period" : mix}
             />
@@ -252,7 +259,7 @@ function AhtTab({
               key={`pt-${w.window}`}
               label={`Per-touch AHT — ${WINDOW_LABELS[w.window]}`}
               value={fmtHours(w.perTouchAht.value)}
-              unit="hrs"
+              unit="hrs / touch, incl. unapproved"
               badge={
                 st ? { text: fmtPctSigned(w.perTouchAht.devianceFromTarget), status: st } : null
               }
